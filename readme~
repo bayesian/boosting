@@ -1,0 +1,32 @@
+Fast implementation of GBM
+
+Goal:
+1) Simple (The less lines of code, the better) 
+2) Fast (Handle 40M * 500 features within 12 hours)
+
+Algorithms:
+1) pre-bucketing
+2) bucket sort to scan for the best splitting point
+3) ...... (trim features)
+
+new features:
+1) byte/short: two layer of storage.
+`
+
+Prameters:
+m: number trees
+n: number of leaves per tree
+r: example sampling rate
+s: 
+
+Complexity:
+O(
+
+Components:
+Reader
+
+DataSet (column-wise storage, for both double and short)
+Bucketizer (convert 
+
+
+

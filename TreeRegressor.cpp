@@ -1,6 +1,8 @@
 #include "boosting/TreeRegressor.h"
 
 #include <cstdlib>
+#include <limits>
+#include <boost/random/uniform_real.hpp>
 
 #include "boosting/Tree.h"
 #include "boosting/GbmFun.h"
@@ -15,8 +17,14 @@ namespace boosting {
 
 using namespace std;
 
-inline double rand01() {
-  return ((double)rand()/(double)RAND_MAX);
+// Return true with approximately the desired probability;
+// actual probability may differ by ~ 1/RAND_MAX
+// Not thread safe. But:
+// (1) we're only using this to sample some examples and features,
+//     so we don't care (?)
+// (2) currently TreeRegressor isn't multithreading anyway
+inline bool biasedCoinFlip(double probabilityOfTrue) {
+  return (rand() < probabilityOfTrue * RAND_MAX);
 }
 
 TreeRegressor::SplitNode::SplitNode(const vector<int>* st):
@@ -59,13 +67,27 @@ void TreeRegressor::getBestSplitFromHistogram(
   int* idx,
   double* gain) {
 
+  // The loss function should really be
+  //   (sum of (y - y_mean)^2 for observations left of idx)
+  //     + (sum of (y - y_mean)^2 for observations right of idx)
+  // By math, this equals
+  //   (sum of squares of all y-values)
+  //     - (sum of y-values on left)^2 / (number of observations on left)
+  //     - (sum of y-values on right)^2 / (number of observations on right)
+  // Since the first term (sum of squares of all y-values) is independent
+  // of our choice of where to split, it makes no difference, so we ignore it
+  // in calculating loss.
+
+  // loss function if we don't split at all
   double lossBefore = -1.0 * hist.totalSum * hist.totalSum / hist.totalCnt;
 
-  int cntLeft = 0;
-  double sumLeft = 0.0;
+  int cntLeft = 0;       // number of observations on or to left of idx
+  double sumLeft = 0.0;  // number of observations strictly to right of idx
 
   double bestGain = 0.0;
-  int bestIdx = -1;
+  int bestIdx = -1;      // everything strictly to right of idx
+
+  CHECK(hist.num >= 1);
 
   for (int i = 0; i < hist.num - 1; i++) {
 
@@ -75,14 +97,16 @@ void TreeRegressor::getBestSplitFromHistogram(
     double sumRight = hist.totalSum - sumLeft;
     int cntRight = hist.totalCnt - cntLeft;
 
-    if (cntLeft < FLAGS_min_leaf_examples || cntRight < FLAGS_min_leaf_examples) {
-        continue;
+    if (cntLeft < FLAGS_min_leaf_examples) {
+      continue;
+    }
+    if (cntRight < FLAGS_min_leaf_examples) {
+      break;
     }
 
-    double lossAfter = -1.0 * sumLeft * sumLeft / cntLeft;
-    if (cntRight != 0) {
-      lossAfter += - 1.0 * sumRight * sumRight / cntRight;
-    }
+    double lossAfter =
+      -1.0 * sumLeft * sumLeft / cntLeft
+      - 1.0 * sumRight * sumRight / cntRight;
 
     double gain = lossBefore - lossAfter;
     if (gain > bestGain) {
@@ -106,19 +130,28 @@ TreeRegressor::getBestSplit(const vector<int>* subset,
     return split;
   }
 
-  int bestFid = -1;
-  int bestFv = 0;
+  int bestFid = -1;       // which feature to split on, -1 is invalid
+  int bestFv = 0;         // critical value of that feature
+
+  // gain in prediction accuracy from that split:
+  // initialize to 0 instead of std::numeric_limits<double>::lowest() because,
+  // if no split results in a positive gain, we would rather report that, than
+  // return a valid but degenerate split
   double bestGain = 0.0;
-  double totalSum = 0.0;
+
+  double totalSum = 0.0;  // sum of all target values
 
   for (auto& id : *subset) {
     totalSum += y_[id];
   }
 
+  // For each of a random sampling of features, see if splitting on that
+  // feature results in the biggest improvement so far.
+  // TODO(tiankai): The various fid's can be processed in parallel.
   for (int fid = 0; fid < ds_.numFeatures_; fid++) {
     const auto& f = ds_.features_[fid];
 
-    if (f.encoding == EMPTY || rand01() < featureSamplingRate) {
+    if (f.encoding == EMPTY || !biasedCoinFlip(featureSamplingRate)) {
       continue;
     }
 
@@ -137,8 +170,8 @@ TreeRegressor::getBestSplit(const vector<int>* subset,
 
     if (gain > bestGain) {
       bestFid = fid;
-      bestGain = gain;
       bestFv = fv;
+      bestGain = gain;
     }
   }
   split->fid = bestFid;
@@ -157,14 +190,19 @@ TreeNode<uint16_t>* TreeRegressor::getTree(
   const double featureSamplingRate,
   double fimps[]) {
 
+  // randomly sample data in ds_
   vector<int>* subset = new vector<int>();
   for (int i = 0; i < ds_.getNumExamples(); i++) {
-    if (rand01() < exampleSamplingRate) {
+    if (biasedCoinFlip(exampleSamplingRate)) {
       subset->push_back(i);
     }
   }
+  CHECK(subset->size() >= FLAGS_min_leaf_examples * numLeaves);
 
+  // compute the decision tree in SplitNode's
   SplitNode* root = getBestSplits(subset, numLeaves - 1, featureSamplingRate);
+
+  // convert the decision tree to PartitionNode's and LeafNode's
   return getTreeHelper(root, fimps);
 }
 
@@ -175,13 +213,15 @@ TreeNode<uint16_t>* TreeRegressor::getTreeHelper(
   if (split == NULL) {
     return NULL;
   } else if (!split->selected) {
+    // leaf of decision tree
     double fvote = fun_.getLeafVal(*(split->subset), y_);
     LOG(INFO) << "leaf:  " << fvote << ", #examples:"
               << split->subset->size();
+    CHECK(split->subset->size() >= FLAGS_min_leaf_examples);
 
     return new LeafNode<uint16_t>(fvote);
-
   } else {
+    // internal node of decision tree
     LOG(INFO) << "select split: " << split->fid << ":" << split->fv
               << " gain: " << split->gain << ", #examples:"
               << split->subset->size() << ", min partition: "
@@ -198,17 +238,22 @@ TreeNode<uint16_t>* TreeRegressor::getTreeHelper(
 }
 
 TreeRegressor::SplitNode* TreeRegressor::getBestSplits(
-  const vector<int>* subset, const int k, double featureSamplingRate) {
+  const vector<int>* subset, const int numSplits, double featureSamplingRate) {
 
   CHECK(subset != NULL);
 
+  // Compute the root of the decision tree.
   SplitNode* firstSplit = getBestSplit(subset, featureSamplingRate, false);
+
   int numSelected = 0;
-
   do {
-    double bestGain = 0;
-    vector<SplitNode*>::iterator best_it;
+    // frontiers_.size() = #leaves = #internal nodes + 1 = numSelected + 1
+    CHECK(frontiers_.size() == numSelected+1);
 
+    // Do a linear search over the leaves to find the next split with the most
+    // gain.
+    double bestGain = 0.0;
+    vector<SplitNode*>::iterator best_it = frontiers_.end();
     for (auto it = frontiers_.begin(); it != frontiers_.end(); it++) {
       if ((*it)->gain > bestGain) {
         bestGain = (*it)->gain;
@@ -216,21 +261,28 @@ TreeRegressor::SplitNode* TreeRegressor::getBestSplits(
       }
     }
 
+    if (best_it == frontiers_.end()) {
+      // no gain from any split
+      break;
+    }
+
+    CHECK(bestGain > 0.0);
+
     (*best_it)->selected = true;
     numSelected++;
-
     SplitNode* bestSplit = *best_it;
     frontiers_.erase(best_it);
 
+    // Now that we've selected bestSplit, expand its left and right children.
     vector<int>* left = new vector<int>();
     vector<int>* right = new vector<int>();
 
     splitExamples(*bestSplit, left, right);
-    bool terminal = (numSelected == k);
+    bool terminal = (numSelected == numSplits);
 
     bestSplit->left = getBestSplit(left, featureSamplingRate, terminal);
     bestSplit->right = getBestSplit(right, featureSamplingRate, terminal);
-  } while (numSelected < k);
+  } while (numSelected < numSplits);
 
   return firstSplit;
 }

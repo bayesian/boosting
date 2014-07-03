@@ -26,13 +26,15 @@ bool Config::readConfig(const std::string& fileName) {
     featureSamplingRate_ = cfg["feature_sampling_rate"].asDouble();
     learningRate_ = cfg["learning_rate"].asDouble();
 
+    // load dictionary: indices <--> column names
     const dynamic& columnNames = cfg["all_columns"];
     unordered_map<fbstring, int> columnIdx;
     int cidx = 0;
-
     for (auto it = columnNames.begin(); it != columnNames.end(); ++it) {
-      allColumns_.emplace_back(it->asString().toStdString());
-      columnIdx[it->asString()] = cidx;
+      auto columnName = it->asString();
+      allColumns_.emplace_back(columnName.toStdString());
+      CHECK(columnIdx.find(columnName) == columnIdx.end());
+      columnIdx[columnName] = cidx;
       cidx++;
     }
 

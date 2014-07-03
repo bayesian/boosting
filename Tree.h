@@ -116,6 +116,7 @@ class LeafNode : public TreeNode<T> {
   double fvote_;
 };
 
+// load a regression tree from Json
 template <class T>
 TreeNode<T>* fromJson(const folly::dynamic& obj) {
   int index = obj["index"].asInt();

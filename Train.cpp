@@ -128,18 +128,20 @@ class DataChunk : public apache::thrift::concurrency::Runnable {
 
   const Config& cfg_;
   const DataSet& dataSet_;
-  CounterMonitor* monitorPtr_;
+  CounterMonitor* monitorPtr_;  // for threading purposes
   vector<string> lines_;
   vector<vector<double>> featureVectors_;
   vector<double> targets_;
 
 };
 
+// Divide training data file's lines into chunks,
+// and parse chunks concurrently if desired/possible
 void readIntoDataChunks(istream& in,
                         vector<boost::shared_ptr<DataChunk>>* chunks,
                         size_t chunkSize, const Config& cfg,
                         const DataSet& dataSet) {
-  // Read lines, placing them into the appropriate chunk
+  // Read lines, placing them into chunks
   CounterMonitor monitor(0);
   boost::shared_ptr<DataChunk> curChunkPtr =
     boost::make_shared<DataChunk>(cfg, dataSet, &monitor);
@@ -147,6 +149,7 @@ void readIntoDataChunks(istream& in,
   while (getline(in, line)) {
     curChunkPtr->addLine(line);
     if (curChunkPtr->getLineBufferSize() >= chunkSize) {
+      // filled up current chunk, so start another one
       chunks->push_back(curChunkPtr);
       curChunkPtr = boost::make_shared<DataChunk>(cfg, dataSet, &monitor);
     }
@@ -169,15 +172,17 @@ void readIntoDataChunks(istream& in,
   }
 }
 
+// write feature importance vector
 void dumpFimps(const string& fileName, const Config& cfg, double fimps[]) {
   ofstream fs(fileName);
   for (int fid = 0; fid < cfg.getNumFeatures(); fid++) {
     fs << fid << '\t' << fimps[fid] << '\t'
-       << cfg.getFeatureName(fid) << endl;
+       << cfg.getFeatureName(fid) << '\n';
   }
   fs.close();
 }
 
+// write Json dump of boosting model
 template <class T>
 void dumpModel(const string& fileName,
                const vector<TreeNode<T>* >& model) {
@@ -222,6 +227,9 @@ int main(int argc, char **argv) {
              FLAGS_num_examples_for_training);
 
   if (!FLAGS_eval_only) {
+    // Compute model from training files
+
+    // First, load training files
     vector<folly::StringPiece> sv;
     folly::split(',', FLAGS_training_files, sv);
 
@@ -246,6 +254,7 @@ int main(int argc, char **argv) {
 
     ds.close();
 
+    // Second, train the models
     Gbm engine(fun, ds, cfg);
     double* fimps = new double[cfg.getNumFeatures()];
     for (int i = 0; i < cfg.getNumFeatures(); i++) {
@@ -253,9 +262,12 @@ int main(int argc, char **argv) {
     }
     engine.getModel(&model, fimps);
 
+    // Third, write the model files
     dumpFimps(FLAGS_model_file + ".fimps", cfg, fimps);
     dumpModel(FLAGS_model_file, model);
   } else {
+    // Skip training, load previously written model
+
     LOG(INFO) << "loading model from " << FLAGS_model_file;
     ifstream fs(FLAGS_model_file);
     stringstream buffer;
@@ -271,6 +283,8 @@ int main(int argc, char **argv) {
   }
 
   if (FLAGS_testing_files != "") {
+    // See how well the model performs on testing data
+
     double target, score;
     boost::scoped_array<double> fvec(new double[cfg.getNumFeatures()]);
     int agreeCount = 0;

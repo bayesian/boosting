@@ -105,6 +105,8 @@ class DataSet {
   friend class Gbm;
 };
 
+// partition subset into left and right, depending
+// on how the values of fvec compare to fv
 template<class T> void split(const std::vector<int>& subset,
                              std::vector<int>* left,
                              std::vector<int>* right,

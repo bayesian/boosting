@@ -43,11 +43,11 @@ bool DataSet::getRow(const string& line, double* target,
     const auto& trainColumns = cfg_.getTrainIdx();
 
     for (int fid = 0; fid < trainColumns.size(); fid++) {
-      fvec[fid] = atof(sv[trainColumns[fid]].data());
+      fvec[fid] = atof(sv[trainColumns[fid]].toString().c_str());
     }
-    *target = atof(sv[cfg_.getTargetIdx()].data());
+    *target = atof(sv[cfg_.getTargetIdx()].toString().c_str());
     if (cfg_.getCompareIdx() != -1 && cmpValue != NULL) {
-      *cmpValue = atof(sv[cfg_.getCompareIdx()].data());
+      *cmpValue = atof(sv[cfg_.getCompareIdx()].toString().c_str());
     }
 
   } catch (...) {

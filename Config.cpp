@@ -1,11 +1,11 @@
-#include "boosting/Config.h"
+#include "Config.h"
 
 #include <fstream>
 #include <unordered_map>
 
-#include "gflags/gflags.h"
-#include "glog/logging.h"
-#include "third_party/folly/json.h"
+#include <gflags/gflags.h>
+#include <glog/logging.h>
+#include <folly/json.h>
 
 namespace boosting {
 

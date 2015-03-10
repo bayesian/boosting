@@ -1,14 +1,14 @@
-#include "boosting/DataSet.h"
+#include "DataSet.h"
 
 #include <algorithm>
 #include <cstring>
 #include <limits>
 
-#include "boosting/Config.h"
-#include "boosting/Tree.h"
+#include "Config.h"
+#include "Tree.h"
 #include "gflags/gflags.h"
-#include "third_party/folly/Conv.h"
-#include "third_party/folly/String.h"
+#include "folly/Conv.h"
+#include "folly/String.h"
 
 namespace boosting {
 

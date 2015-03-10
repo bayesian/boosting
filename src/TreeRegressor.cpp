@@ -1,12 +1,12 @@
-#include "boosting/TreeRegressor.h"
+#include "TreeRegressor.h"
 
 #include <cstdlib>
 #include <limits>
 #include <boost/random/uniform_real.hpp>
 
-#include "boosting/Tree.h"
-#include "boosting/GbmFun.h"
-#include "boosting/DataSet.h"
+#include "Tree.h"
+#include "GbmFun.h"
+#include "DataSet.h"
 #include "gflags/gflags.h"
 #include "glog/logging.h"
 

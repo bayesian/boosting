@@ -1,21 +1,95 @@
-#include "boosting/TreeRegressor.h"
+#include "TreeRegressor.h"
 
 #include <cstdlib>
 #include <limits>
 #include <boost/random/uniform_real.hpp>
 
-#include "boosting/Tree.h"
-#include "boosting/GbmFun.h"
-#include "boosting/DataSet.h"
+#include "Concurrency.h"
+#include "GbmFun.h"
+#include "DataSet.h"
 #include "gflags/gflags.h"
 #include "glog/logging.h"
+#include "Tree.h"
 
 DEFINE_int32(min_leaf_examples, 256,
-             "minimum number of data points in the leaf");
+        "minimum number of data points in the leaf");
 
 namespace boosting {
 
 using namespace std;
+
+class ParallelBestSplit : public apache::thrift::concurrency::Runnable {
+    public: 
+        struct ParallelSplitState {
+            int bestFid, bestFv; 
+            double bestGain;
+            ParallelSplitState() {
+                bestFid = 0; bestFv = 0; bestGain = 0;
+            }
+        };
+    private:
+        CounterMonitor& monitor;
+        TreeRegressor& regressor;
+        ParallelSplitState& state;
+        int workerId, numWorkers;
+        const double totalSum;
+        const vector<int>* subset;
+        const double featureSamplingRate;
+        const DataSet& ds;
+    public:
+        ParallelBestSplit(
+                CounterMonitor& monitor_,
+                TreeRegressor& regressor_,
+                ParallelSplitState& state_,
+                int workerId_,
+                int numWorkers_,
+                const double totalSum_,
+                const vector<int>* subset_,
+                const double featureSamplingRate_,
+                const DataSet& ds_): 
+            monitor(monitor_),
+            regressor(regressor_),
+            state(state_),
+            workerId(workerId_),
+            numWorkers(numWorkers_),
+            totalSum(totalSum_),
+            subset(subset_),
+            featureSamplingRate(featureSamplingRate_),
+            ds(ds_) {
+        };
+
+        void run() {
+            for (int fid = 0; fid < ds.numFeatures_; fid++) {
+                if (fid % numWorkers != workerId) continue;
+
+                const auto& f = ds.features_[fid];
+
+                if (f.encoding == EMPTY || !biasedCoinFlip(featureSamplingRate)) {
+                    continue;
+                }
+
+                TreeRegressor::Histogram hist(f.transitions.size() + 1, subset->size(), totalSum);
+
+                if (f.encoding == BYTE) {
+                    regressor.buildHistogram<uint8_t>(*subset, *(f.bvec), hist);
+                } else {
+                    CHECK(f.encoding == SHORT);
+                    regressor.buildHistogram<uint16_t>(*subset, *(f.svec), hist);
+                }
+
+                int fv;
+                double gain;
+                regressor.getBestSplitFromHistogram(hist, &fv, &gain);
+
+                if (gain > state.bestGain) {
+                    state.bestFid = fid;
+                    state.bestFv = fv;
+                    state.bestGain = gain;
+                }
+            }
+            monitor.decrement();
+        };
+};
 
 // Return true with approximately the desired probability;
 // actual probability may differ by ~ 1/RAND_MAX
@@ -148,35 +222,26 @@ TreeRegressor::getBestSplit(const vector<int>* subset,
   // For each of a random sampling of features, see if splitting on that
   // feature results in the biggest improvement so far.
   // TODO(tiankai): The various fid's can be processed in parallel.
-  for (int fid = 0; fid < ds_.numFeatures_; fid++) {
-    const auto& f = ds_.features_[fid];
+  CounterMonitor monitor(FLAGS_num_threads);
+  boost::scoped_array<ParallelBestSplit::ParallelSplitState> splitStates(
+          new ParallelBestSplit::ParallelSplitState[FLAGS_num_threads]);
 
-    if (f.encoding == EMPTY || !biasedCoinFlip(featureSamplingRate)) {
-      continue;
-    }
-
-    Histogram hist(f.transitions.size() + 1, subset->size(), totalSum);
-
-    if (f.encoding == BYTE) {
-      buildHistogram<uint8_t>(*subset, *(f.bvec), hist);
-    } else {
-      CHECK(f.encoding == SHORT);
-      buildHistogram<uint16_t>(*subset, *(f.svec), hist);
-    }
-
-    int fv;
-    double gain;
-    getBestSplitFromHistogram(hist, &fv, &gain);
-
-    if (gain > bestGain) {
-      bestFid = fid;
-      bestFv = fv;
-      bestGain = gain;
-    }
+  
+  for (int wid = 0; wid < FLAGS_num_threads; wid++) {
+      Concurrency::threadManager->add(
+              boost::shared_ptr<apache::thrift::concurrency::Runnable>(
+                  new ParallelBestSplit(
+                      monitor, *this, splitStates[wid], wid, FLAGS_num_threads, 
+                      totalSum, subset, featureSamplingRate, ds_)));
   }
-  split->fid = bestFid;
-  split->fv = bestFv;
-  split->gain = bestGain;
+  monitor.wait();
+  for (int wid = 0; wid < FLAGS_num_threads; wid++) {
+      if (splitStates[wid].bestGain > split->gain) {
+          split->fid = splitStates[wid].bestFid;
+          split->fv = splitStates[wid].bestFv;
+          split->gain = splitStates[wid].bestGain;
+      }
+  }
 
   frontiers_.push_back(split);
   allSplits_.push_back(split);

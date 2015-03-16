@@ -103,6 +103,7 @@ class DataSet {
 
   friend class TreeRegressor;
   friend class Gbm;
+  friend class ParallelBestSplit;
 };
 
 // partition subset into left and right, depending

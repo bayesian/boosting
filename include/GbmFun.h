@@ -65,6 +65,7 @@ class LeastSquareFun : public GbmFun {
   }
 
   double getInitLoss(const std::vector<double>& yvec) const {
+    // Shortcut for computing \sum (y_i - avg(y_i))^2
     double sumy = 0.0;
     double sumy2 = 0.0;
 

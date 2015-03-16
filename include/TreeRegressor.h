@@ -6,6 +6,8 @@
 
 namespace boosting {
 
+inline bool biasedCoinFlip(double p);
+
 class DataSet;
 template<class T> class TreeNode;
 class GbmFun;
@@ -122,6 +124,8 @@ class TreeRegressor {
 
   // memory management, to delete SplitNode's upon destruction
   std::vector<SplitNode*> allSplits_;
+
+  friend class ParallelBestSplit;
 
 };
 

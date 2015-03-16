@@ -33,7 +33,7 @@ DEFINE_string(training_files, "",
               "comma separated list of data files for training");
 
 DEFINE_string(testing_files, "",
-              "comma separated list of data files for training");
+              "comma separated list of data files for testing");
 
 DEFINE_string(model_file, "",
               "file contains the whole model");
@@ -49,7 +49,6 @@ DEFINE_int32(num_examples_for_training, -1,
              " -1 will use all available");
 
 const int CHUNK_SIZE = 2500;  // # of lines each data loading chunk may parse
-
 
 /**
  * Utility class used to parallelize dataset loading.
@@ -160,15 +159,15 @@ void readIntoDataChunks(istream& in,
 
   // Parse all chunks
   if (FLAGS_num_threads > 0 && !chunks->empty()) {
-    monitor.init(chunks->size());
-    for (auto chunkPtr : *chunks) {
-      Concurrency::threadManager->add(chunkPtr);
-    }
-    monitor.wait();
-  } else {
-    for (auto chunkPtr : *chunks) {
-      chunkPtr->parseLines();
-    }
+    monitor.init(chunks->size());                 
+    for (auto chunkPtr : *chunks) {               
+      Concurrency::threadManager->add(chunkPtr);  
+    }                                             
+    monitor.wait();                               
+  } else {                                        
+    for (auto chunkPtr : *chunks) {               
+      chunkPtr->parseLines();                     
+    }                                             
   }
 }
 
@@ -335,13 +334,18 @@ int main(int argc, char **argv) {
         }
       }
     }
+
     if (FLAGS_find_optimal_num_trees) {
+        cout << "Optimal num tree stats:\t";
       cout << model.size() << '\t';
       for (int i = 0; i < model.size(); i++) {
         cout << funs[i].getLoss() << '\t';
       }
+      cout << endl;
     }
 
+
+    cout << "Avg loss on test: " << fun.getLoss() / fun.getNumExamples() << endl;
     cout << fun.getNumExamples() << '\t' << fun.getReduction() << '\t'
          << fun.getLoss() << '\t' << sumy << '\t' << sumy2
          << '\t' << agreeCount << endl;

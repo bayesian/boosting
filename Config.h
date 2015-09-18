@@ -41,6 +41,10 @@ struct Config {
     return targetIdx_;
   }
 
+  int getPosIdx() const {
+    return posIdx_;
+  }
+
   int getCompareIdx() const {
     return cmpIdx_;
   }
@@ -84,6 +88,7 @@ struct Config {
 
   int targetIdx_;
   int cmpIdx_;
+  int posIdx_;
   std::vector<int> trainIdx_;
   std::vector<int> weakIdx_;
   std::vector<int> evalIdx_;

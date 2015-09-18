@@ -77,10 +77,11 @@ public:
     featureVectors_.reserve(lines_.size());
     targets_.reserve(lines_.size());
     boost::scoped_array<double> farr(new double[cfg_.getNumFeatures()]);
-    double target;
+    double target, pos;
     for (const string& line : lines_) {
-      if (dataSet_.getRow(line, &target, farr)) {
+      if (dataSet_.getRow(line, &target, &pos, farr)) {
         targets_.push_back(target);
+	positions_.push_back(pos);
         featureVectors_.emplace_back(farr.get(),
                                      farr.get() + cfg_.getNumFeatures());
       }
@@ -102,6 +103,10 @@ public:
     return targets_;
   }
 
+  const vector<double>& getPositions() const {
+    return positions_;
+  }
+
   size_t getLineBufferSize() const {
     return lines_.size();
   }
@@ -120,7 +125,7 @@ public:
     for (size_t i = 0; i < size; ++i) {
       const auto fvec = featureVectors_[i];
       copy(fvec.begin(), fvec.end(), farr.get());
-      if (!dataSet->addVector(farr, targets_[i])) {
+      if (!dataSet->addVector(farr, targets_[i], positions_[i])) {
         return i;
       }
     }
@@ -135,6 +140,7 @@ private:
   vector<string> lines_;
   vector<vector<double>> featureVectors_;
   vector<double> targets_;
+  vector<double> positions_;
 
 };
 
@@ -298,7 +304,7 @@ int main(int argc, char **argv) {
     }
 
     // See how well the model performs on testing data
-    double target, score;
+    double target, score, pos;
     boost::scoped_array<double> fvec(new double[cfg.getNumFeatures()]);
     int numEvalColumns = cfg.getEvalIdx().size();
     boost::scoped_array<string> feval(new string[numEvalColumns]);
@@ -322,14 +328,14 @@ int main(int argc, char **argv) {
       string line;
       vector<double> scores;
       while(getline(*is, line)) {
-        ds.getRow(line, &target, fvec, &score);
+        ds.getRow(line, &target, &pos, fvec, &score);
         sumy += target;
         sumy2 += target * target;
         double f;
         if (FLAGS_find_optimal_num_trees) {
           f = predict_vec(model, fvec, &scores);
           for (int i = 0; i < model.size(); i++) {
-            funs[i].accumulateExampleLoss(target, scores[i]);
+            funs[i].accumulateExampleLoss(target, pos, scores[i]);
           }
           scores.clear();
         } else {
@@ -344,7 +350,8 @@ int main(int argc, char **argv) {
 	  (*os) << f << endl;
 	}
 
-	fun.accumulateExampleLoss(target, f);
+	fun.accumulateExampleLoss(target, pos, f);
+
 	if (fabs(score - f) <= 1e-5) {
 	  agreeCount++;
 	}

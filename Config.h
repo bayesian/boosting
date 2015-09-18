@@ -62,6 +62,10 @@ struct Config {
     return weakIdx_;
   }
 
+  const std::vector<int>& getEvalIdx() const {
+    return evalIdx_;
+  }
+
   const std::vector<std::string>& getColumnNames() const {
     return allColumns_;
   }
@@ -82,6 +86,7 @@ struct Config {
   int cmpIdx_;
   std::vector<int> trainIdx_;
   std::vector<int> weakIdx_;
+  std::vector<int> evalIdx_;
 
   std::vector<std::string> allColumns_;
   char delimiter_;

@@ -27,6 +27,18 @@ DataSet::DataSet(const Config& cfg, int bucketingThresh, int examplesThresh)
   }
 }
 
+bool DataSet::getEvalColumns(const std::string& line,
+			     boost::scoped_array<std::string>& feval) const {
+  vector<folly::StringPiece> sv;
+  folly::split(cfg_.getDelimiter(), line, sv);
+  const auto& evalColumns = cfg_.getEvalIdx();
+
+  for (int fid = 0; fid < evalColumns.size(); fid++) {
+    feval[fid] = sv[evalColumns[fid]].toString();
+  }
+  return true;
+}
+
 bool DataSet::getRow(const string& line, double* target,
                      boost::scoped_array<double>& fvec,
                      double* cmpValue) const {

@@ -54,6 +54,11 @@ bool Config::readConfig(const std::string& fileName) {
       weakIdx_.push_back(columnIdx.at(it->asString()));
     }
 
+    const dynamic& evalColumns = cfg["eval_output_columns"];
+    for (auto it = evalColumns.begin(); it != evalColumns.end(); ++it) {
+      evalIdx_.push_back(columnIdx.at(it->asString()));
+    }
+
     const dynamic& targetColumn = cfg["target_column"];
     targetIdx_ = columnIdx.at(targetColumn.asString());
 

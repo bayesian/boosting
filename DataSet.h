@@ -56,6 +56,9 @@ class DataSet {
               boost::scoped_array<double>& fvec,
               double* cmpValue = NULL) const;
 
+  bool getEvalColumns(const std::string& line,
+		      boost::scoped_array<std::string>& feval) const;
+
   int getNumExamples() const {
     return numExamples_;
   }

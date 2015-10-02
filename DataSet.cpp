@@ -1,14 +1,14 @@
-#include "boosting/DataSet.h"
+#include "DataSet.h"
 
 #include <algorithm>
 #include <cstring>
 #include <limits>
 
-#include "boosting/Config.h"
-#include "boosting/Tree.h"
-#include "gflags/gflags.h"
-#include "third_party/folly/Conv.h"
-#include "third_party/folly/String.h"
+#include "Config.h"
+#include "Tree.h"
+#include <gflags/gflags.h>
+#include <folly/Conv.h>
+#include <folly/String.h>
 
 namespace boosting {
 
@@ -25,6 +25,18 @@ DataSet::DataSet(const Config& cfg, int bucketingThresh, int examplesThresh)
     features_[i].fvec.reset(new vector<double>());
     features_[i].encoding = DOUBLE;
   }
+}
+
+bool DataSet::getEvalColumns(const std::string& line,
+			     boost::scoped_array<std::string>& feval) const {
+  vector<folly::StringPiece> sv;
+  folly::split(cfg_.getDelimiter(), line, sv);
+  const auto& evalColumns = cfg_.getEvalIdx();
+
+  for (int fid = 0; fid < evalColumns.size(); fid++) {
+    feval[fid] = sv[evalColumns[fid]].toString();
+  }
+  return true;
 }
 
 bool DataSet::getRow(const string& line, double* target,

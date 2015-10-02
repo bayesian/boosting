@@ -1,16 +1,16 @@
-#include "boosting/Gbm.h"
+#include "Gbm.h"
 
 #include <boost/scoped_array.hpp>
 #include <boost/shared_ptr.hpp>
 #include <vector>
 
-#include "boosting/Concurrency.h"
-#include "boosting/Config.h"
-#include "boosting/DataSet.h"
-#include "boosting/GbmFun.h"
-#include "boosting/Tree.h"
-#include "boosting/TreeRegressor.h"
-#include "gflags/gflags.h"
+#include "Concurrency.h"
+#include "Config.h"
+#include "DataSet.h"
+#include "GbmFun.h"
+#include "Tree.h"
+#include "TreeRegressor.h"
+#include <gflags/gflags.h>
 
 namespace boosting {
 

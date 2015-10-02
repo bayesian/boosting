@@ -1,11 +1,11 @@
-#include "boosting/Config.h"
+#include "Config.h"
 
 #include <fstream>
 #include <unordered_map>
 
-#include "gflags/gflags.h"
-#include "glog/logging.h"
-#include "third_party/folly/json.h"
+#include <gflags/gflags.h>
+#include <glog/logging.h>
+#include <folly/json.h>
 
 namespace boosting {
 
@@ -52,6 +52,11 @@ bool Config::readConfig(const std::string& fileName) {
     const dynamic& weakColumns = cfg["weak_columns"];
     for (auto it = weakColumns.begin(); it != weakColumns.end(); ++it) {
       weakIdx_.push_back(columnIdx.at(it->asString()));
+    }
+
+    const dynamic& evalColumns = cfg["eval_output_columns"];
+    for (auto it = evalColumns.begin(); it != evalColumns.end(); ++it) {
+      evalIdx_.push_back(columnIdx.at(it->asString()));
     }
 
     const dynamic& targetColumn = cfg["target_column"];

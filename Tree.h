@@ -2,8 +2,8 @@
 
 #include <boost/scoped_array.hpp>
 
-#include "third_party/folly/json.h"
-#include "third_party/folly/Conv.h"
+#include "folly/json.h"
+#include "folly/Conv.h"
 
 namespace boosting {
 

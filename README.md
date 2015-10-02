@@ -1,9 +1,7 @@
-fsb: fast & simple boosting
-
 Fast & Simple implementation of GBM
 
 Goal:
-1) Fast (Handle 40M rows * 500 features within 12 hours)
+1) Fast (Handle 40M rows * 500 features within 10 hours)
 2) Simple (The less lines of code, the better) <= 3000
 3) Mudular/Extensible for further improvements
 

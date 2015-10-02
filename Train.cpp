@@ -7,15 +7,15 @@
 
 #include "boost/make_shared.hpp"
 #include "boost/shared_ptr.hpp"
-#include "boosting/Concurrency.h"
-#include "boosting/Config.h"
-#include "boosting/GbmFun.h"
-#include "boosting/Gbm.h"
-#include "boosting/DataSet.h"
-#include "boosting/Tree.h"
+#include "Concurrency.h"
+#include "Config.h"
+#include "GbmFun.h"
+#include "Gbm.h"
+#include "DataSet.h"
+#include "Tree.h"
 #include "gflags/gflags.h"
-#include "third_party/folly/String.h"
-#include "third_party/folly/json.h"
+#include "folly/String.h"
+#include "folly/json.h"
 #include "thrift/concurrency/PosixThreadFactory.h"
 #include "thrift/concurrency/Thread.h"
 #include "thrift/concurrency/ThreadManager.h"
@@ -34,6 +34,9 @@ DEFINE_string(training_files, "",
 
 DEFINE_string(testing_files, "",
               "comma separated list of data files for training");
+
+DEFINE_string(eval_output_file, "",
+	      "file contains eval output:could be stdout");
 
 DEFINE_string(model_file, "",
               "file contains the whole model");
@@ -56,11 +59,11 @@ const int CHUNK_SIZE = 2500;  // # of lines each data loading chunk may parse
  */
 class DataChunk : public apache::thrift::concurrency::Runnable {
 
- public:
+public:
 
   DataChunk(const Config& cfg, const DataSet& dataSet,
             CounterMonitor* monitorPtr = NULL) :
-      cfg_(cfg), dataSet_(dataSet), monitorPtr_(monitorPtr) {}
+    cfg_(cfg), dataSet_(dataSet), monitorPtr_(monitorPtr) {}
 
   bool addLine(const string& s) {
     if (s.empty()) {
@@ -124,7 +127,7 @@ class DataChunk : public apache::thrift::concurrency::Runnable {
     return size;
   }
 
- private:
+private:
 
   const Config& cfg_;
   const DataSet& dataSet_;
@@ -283,10 +286,22 @@ int main(int argc, char **argv) {
   }
 
   if (FLAGS_testing_files != "") {
-    // See how well the model performs on testing data
+    ostream *os = NULL;
+    ofstream ofs;
+    if (FLAGS_eval_output_file != "") {
+      if (FLAGS_eval_output_file == "stdout") {
+	os = &cout;
+      } else {
+	ofs.open(FLAGS_eval_output_file);
+	os = &ofs;
+      }
+    }
 
+    // See how well the model performs on testing data
     double target, score;
     boost::scoped_array<double> fvec(new double[cfg.getNumFeatures()]);
+    int numEvalColumns = cfg.getEvalIdx().size();
+    boost::scoped_array<string> feval(new string[numEvalColumns]);
     int agreeCount = 0;
     double sumy = 0.0, sumy2 = 0.0;
     vector<LeastSquareFun> funs(model.size());
@@ -321,34 +336,45 @@ int main(int argc, char **argv) {
           f = predict(model, fvec);
         }
 
-        fun.accumulateExampleLoss(target, f);
-        if (fabs(score - f) <= 1e-5) {
-          agreeCount++;
-        }
+	if (os != NULL) {
+	  ds.getEvalColumns(line, feval);
+	  for (int i = 0; i < numEvalColumns; i++) {
+	    (*os) << feval[i] << '\t';
+	  }
+	  (*os) << f << endl;
+	}
 
-        if (fun.getNumExamples() % 1000 == 0) {
-          LOG(INFO) << "test loss reduction: " << fun.getReduction()
-                    << " on num examples: " << fun.getNumExamples()
-                    << " total loss: " << fun.getLoss()
-                    << " logged score: " << score
-                    << " computed score: " << f;
-        }
+	fun.accumulateExampleLoss(target, f);
+	if (fabs(score - f) <= 1e-5) {
+	  agreeCount++;
+	}
+
+	if (fun.getNumExamples() % 1000 == 0) {
+	  LOG(INFO) << "test loss reduction: " << fun.getReduction()
+		    << " on num examples: " << fun.getNumExamples()
+		    << " total loss: " << fun.getLoss()
+		    << " logged score: " << score
+		    << " computed score: " << f;
+	}
       }
     }
+    if (os != NULL) {
+      os->flush();
+    }
+
     if (FLAGS_find_optimal_num_trees) {
       cout << model.size() << '\t';
       for (int i = 0; i < model.size(); i++) {
-        cout << funs[i].getLoss() << '\t';
+	cout << funs[i].getLoss() << '\t';
       }
     }
 
-    cout << fun.getNumExamples() << '\t' << fun.getReduction() << '\t'
-         << fun.getLoss() << '\t' << sumy << '\t' << sumy2
-         << '\t' << agreeCount << endl;
+    LOG(INFO) << fun.getNumExamples() << '\t' << fun.getReduction() << '\t'
+	 << fun.getLoss() << '\t' << sumy << '\t' << sumy2
+	 << '\t' << agreeCount << endl;
 
     LOG(INFO) << "test loss reduction: " << fun.getReduction()
-              << " on num examples: " << fun.getNumExamples();
+	      << " on num examples: " << fun.getNumExamples();
   }
-
 }
 

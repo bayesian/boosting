@@ -20,7 +20,7 @@ template <class T>
 class PartitionNode : public TreeNode<T> {
  public:
   PartitionNode(int fid, T fv)
-    : fid_(fid), fv_(fv),
+    : fid_(fid), fv_(fv), fvote_(0.0),
     left_(NULL), right_(NULL) {
   }
 
@@ -40,12 +40,20 @@ class PartitionNode : public TreeNode<T> {
     return fv_;
   }
 
+  double getVote() const {
+    return fvote_;
+  }
+  
   void setLeft(TreeNode<T>* left) {
     left_ = left;
   }
 
   void setRight(TreeNode<T>* right) {
     right_ = right;
+  }
+
+  void setVote(double fvote) {
+    fvote_ = fvote;
   }
 
   double eval(const boost::scoped_array<T>& fvec) const {
@@ -68,6 +76,7 @@ class PartitionNode : public TreeNode<T> {
     m.insert("value", fv_);
     m.insert("left", left_->toJson());
     m.insert("right", right_->toJson());
+    m.insert("vote", fvote_);
     return m;
   }
 
@@ -79,6 +88,8 @@ class PartitionNode : public TreeNode<T> {
  private:
   int fid_;
   T fv_;
+  double fvote_;
+  
   TreeNode<T>* left_;
   TreeNode<T>* right_;
 };
@@ -127,6 +138,7 @@ TreeNode<T>* fromJson(const folly::dynamic& obj) {
   } else {
     v = static_cast<T>(obj["value"].asDouble());
   }
+  double vote = obj["vote"].asDouble();
 
   if (index == -1) {
     return new LeafNode<T>(v);
@@ -134,6 +146,7 @@ TreeNode<T>* fromJson(const folly::dynamic& obj) {
     PartitionNode<T>* rt = new PartitionNode<T>(index, v);
     rt->setLeft(fromJson<T>(obj["left"]));
     rt->setRight(fromJson<T>(obj["right"]));
+    rt->setVote(vote);
     return rt;
   }
 }

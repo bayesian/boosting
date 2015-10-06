@@ -228,10 +228,11 @@ TreeNode<uint16_t>* TreeRegressor::getTreeHelper(
               << std::min(split->left->subset->size(), split->right->subset->size());
 
     fimps[split->fid] += split->gain;
-
+    double fvote = fun_.getLeafVal(*(split->subset), y_);
     PartitionNode<uint16_t>* node = new PartitionNode<uint16_t>(split->fid, split->fv);
     node->setLeft(getTreeHelper(split->left, fimps));
     node->setRight(getTreeHelper(split->right, fimps));
+    node->setVote(fvote);
 
     return node;
   }

@@ -147,6 +147,7 @@ TreeNode<double>* Gbm::mapTree(const TreeNode<uint16_t>* rt) {
     int fid = pnode->getFid();
     PartitionNode<double>* newNode = new PartitionNode<double>(
       fid, ds_.features_[fid].transitions[pnode->getFv()]);
+    newNode->setVote(pnode->getVote());
     newNode->setLeft(mapTree(pnode->getLeft()));
     newNode->setRight(mapTree(pnode->getRight()));
     return newNode;

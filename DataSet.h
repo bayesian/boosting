@@ -49,10 +49,11 @@ class DataSet {
  public:
   DataSet(const Config& cfg, int bucketingThresh, int examplesThresh=-1);
 
-  bool addVector(const boost::scoped_array<double>& fvec, double target);
+  bool addVector(const boost::scoped_array<double>& fvec, double target, double pos);
 
   bool getRow(const std::string& line,
               double* target,
+	      double* pos,
               boost::scoped_array<double>& fvec,
               double* cmpValue = NULL) const;
 
@@ -103,6 +104,7 @@ class DataSet {
 
   boost::scoped_array<FeatureData> features_;
   std::vector<double> targets_;
+  std::vector<double> positions_;
 
   friend class TreeRegressor;
   friend class Gbm;

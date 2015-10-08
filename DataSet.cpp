@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstring>
 #include <limits>
+#include <cmath>
 
 #include "Config.h"
 #include "Tree.h"
@@ -39,7 +40,7 @@ bool DataSet::getEvalColumns(const std::string& line,
   return true;
 }
 
-bool DataSet::getRow(const string& line, double* target,
+bool DataSet::getRow(const string& line, double* target, double* pos,
                      boost::scoped_array<double>& fvec,
                      double* cmpValue) const {
   try {
@@ -58,10 +59,15 @@ bool DataSet::getRow(const string& line, double* target,
       fvec[fid] = atof(sv[trainColumns[fid]].toString().c_str());
     }
     *target = atof(sv[cfg_.getTargetIdx()].toString().c_str());
+    if (cfg_.getPosIdx() != -1) {
+      double position = atof(sv[cfg_.getPosIdx()].toString().c_str());
+      *pos = log(3.0)/log(position + 3);
+    } else {
+      *pos = 1.0;
+    }
     if (cfg_.getCompareIdx() != -1 && cmpValue != NULL) {
       *cmpValue = atof(sv[cfg_.getCompareIdx()].toString().c_str());
     }
-
   } catch (...) {
     LOG(ERROR) << "fail to process line: " << line;
     return false;
@@ -97,7 +103,7 @@ double DataSet::getPrediction(TreeNode<uint16_t>* rt, int eid) const {
 }
 
 bool DataSet::addVector(const boost::scoped_array<double>& fvec,
-                        double target) {
+                        double target, double pos) {
   if (examplesThresh_ != -1 && numExamples_ > examplesThresh_) {
     return false;
   }
@@ -126,6 +132,7 @@ bool DataSet::addVector(const boost::scoped_array<double>& fvec,
     }
   }
   targets_.push_back(target);
+  positions_.push_back(pos);
   numExamples_++;
 
   if (bucketingThresh_ != -1 && numExamples_ > bucketingThresh_

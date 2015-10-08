@@ -44,6 +44,10 @@ bool Config::readConfig(const std::string& fileName) {
     cmpIdx_ = (it != cfg.items().end())
       ? columnIdx[it->second.asString()] : -1;
 
+    auto posit = cfg.find("pos_column");
+    posIdx_ = (posit != cfg.items().end())
+      ? columnIdx[posit->second.asString()] : -1;
+
     const dynamic& trainColumns = cfg["train_columns"];
     for (auto it = trainColumns.begin(); it != trainColumns.end(); ++it) {
       trainIdx_.push_back(columnIdx.at(it->asString()));

@@ -1,3 +1,5 @@
+fsb: fast & simple boosting
+
 Fast & Simple implementation of GBM
 
 Goal:

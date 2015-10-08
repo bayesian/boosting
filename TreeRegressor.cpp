@@ -214,7 +214,7 @@ TreeNode<uint16_t>* TreeRegressor::getTreeHelper(
     return NULL;
   } else if (!split->selected) {
     // leaf of decision tree
-    double fvote = fun_.getLeafVal(*(split->subset), y_);
+    double fvote = fun_.getLeafVal(*(split->subset), ds_.positions_, y_);
     LOG(INFO) << "leaf:  " << fvote << ", #examples:"
               << split->subset->size();
     CHECK(split->subset->size() >= FLAGS_min_leaf_examples);
@@ -228,7 +228,7 @@ TreeNode<uint16_t>* TreeRegressor::getTreeHelper(
               << std::min(split->left->subset->size(), split->right->subset->size());
 
     fimps[split->fid] += split->gain;
-    double fvote = fun_.getLeafVal(*(split->subset), y_);
+    double fvote = fun_.getLeafVal(*(split->subset), ds_.positions_, y_);
     PartitionNode<uint16_t>* node = new PartitionNode<uint16_t>(split->fid, split->fv);
     node->setLeft(getTreeHelper(split->left, fimps));
     node->setRight(getTreeHelper(split->right, fimps));

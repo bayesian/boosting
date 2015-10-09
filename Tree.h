@@ -138,11 +138,11 @@ TreeNode<T>* fromJson(const folly::dynamic& obj) {
   } else {
     v = static_cast<T>(obj["value"].asDouble());
   }
-  double vote = obj["vote"].asDouble();
 
   if (index == -1) {
     return new LeafNode<T>(v);
   } else {
+    double vote = obj["vote"].asDouble();
     PartitionNode<T>* rt = new PartitionNode<T>(index, v);
     rt->setLeft(fromJson<T>(obj["left"]));
     rt->setRight(fromJson<T>(obj["right"]));

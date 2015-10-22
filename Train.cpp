@@ -26,6 +26,8 @@ using namespace std;
 DEFINE_int32(num_examples_for_bucketing, 1024*1024*5,
              "number of data points used for data set compression");
 
+DEFINE_int32(random_seed, 123456789, "The random seed.");
+
 DEFINE_string(config_file, "",
               "file contains the configurations");
 
@@ -206,6 +208,8 @@ void dumpModel(const string& fileName,
 
 
 int main(int argc, char **argv) {
+  // Initialize random seed.
+  srand(FLAGS_random_seed);
   stringstream ss;
   for (int i = 0; i < argc; i++) {
     ss << argv[i] << " ";

@@ -118,7 +118,7 @@ class LeafNode : public TreeNode<T> {
     folly::dynamic m = folly::dynamic::object;
 
     m.insert("index", -1);
-    m.insert("value",  fvote_);
+    m.insert("vote", fvote_);
     return m;
   }
 
@@ -134,18 +134,17 @@ template <class T>
 TreeNode<T>* fromJson(const folly::dynamic& obj) {
   int index = obj["index"].asInt();
 
-  T v;
-  if (obj["value"].isInt()) {
-    v = static_cast<T>(obj["value"].asInt());
-  } else {
-    v = static_cast<T>(obj["value"].asDouble());
-  }
-
+  double vote = static_cast<T>(obj["vote"].asDouble());
   if (index == -1) {
-    return new LeafNode<T>(v);
+    return new LeafNode<T>(vote);
   } else {
-    double vote = obj["vote"].asDouble();
-    PartitionNode<T>* rt = new PartitionNode<T>(index, v);
+    T value;
+    if (obj["value"].isInt()) {
+      value = static_cast<T>(obj["value"].asInt());
+    } else {
+      value = static_cast<T>(obj["value"].asDouble());
+    }
+    PartitionNode<T>* rt = new PartitionNode<T>(index, value);
     rt->setLeft(fromJson<T>(obj["left"]));
     rt->setRight(fromJson<T>(obj["right"]));
     rt->setVote(vote);

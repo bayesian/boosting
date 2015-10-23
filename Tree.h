@@ -66,6 +66,7 @@ class PartitionNode : public TreeNode<T> {
   }
 
   void scale(double w) {
+    fvote_ *= w;
     left_->scale(w);
     right_->scale(w);
   }

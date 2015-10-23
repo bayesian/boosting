@@ -190,12 +190,13 @@ void dumpFimps(const string& fileName, const Config& cfg, double fimps[]) {
 // write Json dump of boosting model
 template <class T>
 void dumpModel(const string& fileName,
+	       const Config& cfg,
                const vector<TreeNode<T>* >& model) {
   folly::dynamic m = folly::dynamic::object;
   folly::dynamic trees = {};
 
   for (const auto& t : model) {
-    trees.push_back(std::move(t->toJson()));
+    trees.push_back(std::move(t->toJson(cfg)));
   }
 
   m.insert("trees", trees);
@@ -271,7 +272,7 @@ int main(int argc, char **argv) {
 
     // Third, write the model files
     dumpFimps(FLAGS_model_file + ".fimps", cfg, fimps);
-    dumpModel(FLAGS_model_file, model);
+    dumpModel(FLAGS_model_file, cfg, model);
   } else {
     // Skip training, load previously written model
 

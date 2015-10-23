@@ -104,7 +104,7 @@ void Gbm::getModel(
 
     model->push_back(mapTree(weakModel.get()));
 
-    VLOG(1) << toPrettyJson(weakModel->toJson());
+    VLOG(1) << toPrettyJson(weakModel->toJson(cfg_));
     double newLoss = 0.0;
 
     if (FLAGS_num_threads > 1) {

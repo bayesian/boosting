@@ -4,6 +4,7 @@
 
 #include "folly/json.h"
 #include "folly/Conv.h"
+#include "Config.h"
 
 namespace boosting {
 
@@ -12,7 +13,7 @@ class TreeNode {
  public:
   virtual double eval(const boost::scoped_array<T>& fvec) const = 0;
   virtual void scale(double w) = 0;
-  virtual folly::dynamic toJson() const = 0;
+  virtual folly::dynamic toJson(const Config& cfg) const = 0;
   virtual ~TreeNode() {}
 };
 
@@ -69,14 +70,15 @@ class PartitionNode : public TreeNode<T> {
     right_->scale(w);
   }
 
-  folly::dynamic toJson() const {
+  folly::dynamic toJson(const Config& cfg) const {
     folly::dynamic m = folly::dynamic::object;
 
     m.insert("index", fid_);
     m.insert("value", fv_);
-    m.insert("left", left_->toJson());
-    m.insert("right", right_->toJson());
+    m.insert("left", left_->toJson(cfg));
+    m.insert("right", right_->toJson(cfg));
     m.insert("vote", fvote_);
+    m.insert("feature", cfg.getFeatureName(fid_));
     return m;
   }
 
@@ -112,7 +114,7 @@ class LeafNode : public TreeNode<T> {
     fvote_ *= w;
   }
 
-  folly::dynamic toJson() const {
+  folly::dynamic toJson(const Config& cfg) const {
     folly::dynamic m = folly::dynamic::object;
 
     m.insert("index", -1);

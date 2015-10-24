@@ -209,8 +209,6 @@ void dumpModel(const string& fileName,
 
 
 int main(int argc, char **argv) {
-  // Initialize random seed.
-  srand(FLAGS_random_seed);
   stringstream ss;
   for (int i = 0; i < argc; i++) {
     ss << argv[i] << " ";
@@ -220,6 +218,9 @@ int main(int argc, char **argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   Concurrency::initThreadManager();
+
+  // Initialize random seed.
+  srand(FLAGS_random_seed);
 
   LOG(INFO) << ss.str();
 

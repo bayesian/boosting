@@ -58,6 +58,9 @@ bool DataSet::getRow(const string& line, double* target,
       fvec[fid] = atof(sv[trainColumns[fid]].toString().c_str());
     }
     *target = atof(sv[cfg_.getTargetIdx()].toString().c_str());
+    if (cfg_.getLossFunction() == L2Logistic) {
+      *target = (*target) > 0.0 ? 1.0 : -1.0;
+    }
     if (cfg_.getCompareIdx() != -1 && cmpValue != NULL) {
       *cmpValue = atof(sv[cfg_.getCompareIdx()].toString().c_str());
     }

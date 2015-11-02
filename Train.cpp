@@ -7,10 +7,12 @@
 
 #include "boost/make_shared.hpp"
 #include "boost/shared_ptr.hpp"
+#include "boost/move/unique_ptr.hpp"
 #include "Concurrency.h"
 #include "Config.h"
 #include "GbmFun.h"
 #include "Gbm.h"
+#include "LogisticFun.h"
 #include "DataSet.h"
 #include "Tree.h"
 #include "gflags/gflags.h"
@@ -206,7 +208,13 @@ void dumpModel(const string& fileName,
   fs.close();
 }
 
-
+unique_ptr<GbmFun> getGbmFun(LossFunction loss) {
+  if (loss == L2Regression) {
+    return unique_ptr<GbmFun>(new LeastSquareFun());
+  } else {
+    return unique_ptr<GbmFun>(new LogisticFun());
+  }
+}
 
 int main(int argc, char **argv) {
   stringstream ss;
@@ -225,11 +233,12 @@ int main(int argc, char **argv) {
   LOG(INFO) << ss.str();
 
   Config cfg;
-  LeastSquareFun fun;
 
   LOG(INFO) << "loading config";
 
   CHECK(cfg.readConfig(FLAGS_config_file));
+  unique_ptr<GbmFun> pfun = getGbmFun(cfg.getLossFunction());
+  GbmFun& fun = *pfun;
 
   vector<TreeNode<double>*> model;
   DataSet ds(cfg, FLAGS_num_examples_for_bucketing,
@@ -308,9 +317,11 @@ int main(int argc, char **argv) {
     boost::scoped_array<double> fvec(new double[cfg.getNumFeatures()]);
     int numEvalColumns = cfg.getEvalIdx().size();
     boost::scoped_array<string> feval(new string[numEvalColumns]);
-    int agreeCount = 0;
-    double sumy = 0.0, sumy2 = 0.0;
-    vector<LeastSquareFun> funs(model.size());
+
+    vector<unique_ptr<GbmFun>> funs;
+    for (int i = 0; i < model.size(); i++) {
+      funs.push_back(getGbmFun(cfg.getLossFunction()));
+    }
 
     vector<folly::StringPiece> tsv;
     folly::split(',', FLAGS_testing_files, tsv);
@@ -329,13 +340,11 @@ int main(int argc, char **argv) {
       vector<double> scores;
       while(getline(*is, line)) {
         ds.getRow(line, &target, fvec, &score);
-        sumy += target;
-        sumy2 += target * target;
         double f;
         if (FLAGS_find_optimal_num_trees) {
           f = predict_vec(model, fvec, &scores);
           for (int i = 0; i < model.size(); i++) {
-            funs[i].accumulateExampleLoss(target, scores[i]);
+            funs[i]->accumulateExampleLoss(target, scores[i]);
           }
           scores.clear();
         } else {
@@ -351,9 +360,6 @@ int main(int argc, char **argv) {
 	}
 
 	fun.accumulateExampleLoss(target, f);
-	if (fabs(score - f) <= 1e-5) {
-	  agreeCount++;
-	}
 
 	if (fun.getNumExamples() % 1000 == 0) {
 	  LOG(INFO) << "test loss reduction: " << fun.getReduction()
@@ -371,13 +377,12 @@ int main(int argc, char **argv) {
     if (FLAGS_find_optimal_num_trees) {
       cout << model.size() << '\t';
       for (int i = 0; i < model.size(); i++) {
-	cout << funs[i].getLoss() << '\t';
+	cout << funs[i]->getLoss() << '\t';
       }
     }
 
     LOG(INFO) << fun.getNumExamples() << '\t' << fun.getReduction() << '\t'
-	 << fun.getLoss() << '\t' << sumy << '\t' << sumy2
-	 << '\t' << agreeCount << endl;
+	      << fun.getLoss() << endl;
 
     LOG(INFO) << "test loss reduction: " << fun.getReduction()
 	      << " on num examples: " << fun.getNumExamples();

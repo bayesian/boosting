@@ -6,6 +6,11 @@
 
 namespace boosting {
 
+enum LossFunction {
+  L2Regression = 0,
+  L2Logistic   = 1
+};
+ 
 // Specifying the training parameters and data format
 struct Config {
 
@@ -74,6 +79,10 @@ struct Config {
     return delimiter_;
   }
 
+  LossFunction getLossFunction() const {
+    return lossFunction_;
+  }
+
  private:
 
   int numTrees_;
@@ -84,6 +93,8 @@ struct Config {
 
   int targetIdx_;
   int cmpIdx_;
+  LossFunction lossFunction_;
+  
   std::vector<int> trainIdx_;
   std::vector<int> weakIdx_;
   std::vector<int> evalIdx_;

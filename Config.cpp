@@ -44,6 +44,13 @@ bool Config::readConfig(const std::string& fileName) {
     cmpIdx_ = (it != cfg.items().end())
       ? columnIdx[it->second.asString()] : -1;
 
+    it = cfg.find("loss_function");
+    if (it != cfg.items().end() && it->second.asString() == "logistic") {
+      lossFunction_ = L2Logistic;
+    } else {
+      lossFunction_ = L2Regression;
+    }
+    
     const dynamic& trainColumns = cfg["train_columns"];
     for (auto it = trainColumns.begin(); it != trainColumns.end(); ++it) {
       trainIdx_.push_back(columnIdx.at(it->asString()));

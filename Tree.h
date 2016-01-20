@@ -134,8 +134,8 @@ class LeafNode : public TreeNode<T> {
 template <class T>
 TreeNode<T>* fromJson(const folly::dynamic& obj) {
   int index = obj["index"].asInt();
-
   double vote = static_cast<T>(obj["vote"].asDouble());
+  
   if (index == -1) {
     return new LeafNode<T>(vote);
   } else {

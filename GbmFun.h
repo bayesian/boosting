@@ -27,6 +27,10 @@ class GbmFun {
   virtual void accumulateExampleLoss(const double y, const double f) = 0;
 
   virtual double getReduction() const = 0;
+
+  virtual int getNumExamples() const = 0;
+
+  virtual double getLoss() const = 0;
 };
 
 

@@ -2,6 +2,7 @@
 
 #include <boost/scoped_array.hpp>
 #include <vector>
+#include "glog/logging.h"
 
 namespace boosting {
 
@@ -12,19 +13,23 @@ namespace boosting {
 class GbmFun {
  public:
   virtual double getLeafVal(const std::vector<int>& subset,
-                            const boost::scoped_array<double>& y) const = 0;
+                            const boost::scoped_array<double>& y,
+                            const std::vector<double>* wts = NULL) const = 0;
 
-  virtual double getF0(const std::vector<double>& y) const = 0;
+  virtual double getF0(const std::vector<double>& y,
+                       const std::vector<double>* wts = NULL) const = 0;
 
   virtual void getGradient(const std::vector<double>& y,
                            const boost::scoped_array<double>& F,
-                           boost::scoped_array<double>& grad) const = 0;
+                           boost::scoped_array<double>& grad,
+                           const std::vector<double>* wts = NULL) const = 0;
 
-  virtual double getInitLoss(const std::vector<double>& y) const = 0;
+  virtual double getInitLoss(const std::vector<double>& y,
+                             const std::vector<double>* wts = NULL) const = 0;
 
-  virtual double getExampleLoss(const double y, const double f) const = 0;
+  virtual double getExampleLoss(const double y, const double f, const double w) const = 0;
 
-  virtual void accumulateExampleLoss(const double y, const double f) = 0;
+  virtual void accumulateExampleLoss(const double y, const double f, const double w) = 0;
 
   virtual double getReduction() const = 0;
 
@@ -36,30 +41,36 @@ class GbmFun {
 
 class LeastSquareFun : public GbmFun {
  public:
-  LeastSquareFun() : numExamples_(0), sumy_(0.0), sumy2_(0.0), l2_(0.0) {
+  LeastSquareFun() : numExamples_(0), sumy_(0.0), sumy2_(0.0), l2_(0.0), sumw_(0.0) {
   }
 
   double getLeafVal(const std::vector<int>& subset,
-                    const boost::scoped_array<double>& y) const {
-
-    double sum = 0;
+                    const boost::scoped_array<double>& y, const std::vector<double>* wts = NULL) const {
+    double sumwy = 0;
+    double sumw = 0;
     for (const auto& id : subset) {
-      sum += y[id];
+      double w = ((wts != NULL) ? (*wts)[id] : 1.0);
+      sumw += w;
+      sumwy += w * y[id];
     }
-    return sum/subset.size();
+    return sumwy/sumw;
   }
 
-  double getF0(const std::vector<double>& yvec) const {
-    double sum = 0.0;
-    for (const auto& y : yvec) {
-      sum += y;
+  double getF0(const std::vector<double>& yvec, const std::vector<double>* wts = NULL) const {
+    double sumwy = 0;
+    double sumw = 0;
+    for (int i = 0; i < yvec.size(); i++) {
+      double w = ((wts != NULL) ? (*wts)[i] : 1.0);
+      sumw += w;
+      sumwy += w * yvec[i];
     }
-    return sum/yvec.size();
+    return sumwy/sumw;
   }
 
   void getGradient(const std::vector<double>& y,
                    const boost::scoped_array<double>& F,
-                   boost::scoped_array<double>& grad) const {
+                   boost::scoped_array<double>& grad,
+                   const std::vector<double>* wts = NULL) const {
 
     int size = y.size();
 
@@ -68,31 +79,40 @@ class LeastSquareFun : public GbmFun {
     }
   }
 
-  double getInitLoss(const std::vector<double>& yvec) const {
+  double getInitLoss(const std::vector<double>& yvec,
+                     const std::vector<double>* wts = NULL) const {
+
     double sumy = 0.0;
     double sumy2 = 0.0;
+    double sumw = 0.0;
 
-    for (const auto& y : yvec) {
-      sumy += y;
-      sumy2 += y*y;
+    for (int i = 0; i < yvec.size(); i++) {
+      double w = ((wts != NULL) ? (*wts)[i] : 1.0);
+      double y = yvec[i];
+
+      sumw += w;
+      sumy += w*y;
+      sumy2 += w*y*y;
     }
 
-    return sumy2 - sumy * sumy/yvec.size();
+    return sumy2 - sumy * sumy/sumw;
   }
 
-  double getExampleLoss(const double y, const double f) const {
-    return (y - f) * (y - f);
+  double getExampleLoss(const double y, const double f, const double w) const {
+    return w * (y - f) * (y - f);
   }
 
-  void accumulateExampleLoss(const double y, const double f) {
-    sumy_ += y;
+  void accumulateExampleLoss(const double y, const double f, const double w) {
+    sumy_ += w * y;
     numExamples_ += 1;
-    sumy2_ += y * y;
-    l2_ += getExampleLoss(y, f);
+    sumw_ += w;
+    sumy2_ += w * y * y;
+
+    l2_ += getExampleLoss(y, f, w);
   }
 
   double getReduction() const {
-    return 1.0 - l2_/(sumy2_ - sumy_ * sumy_/numExamples_);
+    return 1.0 - l2_/(sumy2_ - sumy_ * sumy_/sumw_);
   }
 
   int getNumExamples() const {
@@ -108,6 +128,7 @@ class LeastSquareFun : public GbmFun {
   double sumy_;
   double sumy2_;
   double l2_;
+  double sumw_;
 };
 
 }

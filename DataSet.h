@@ -49,18 +49,24 @@ class DataSet {
  public:
   DataSet(const Config& cfg, int bucketingThresh, int examplesThresh=-1);
 
-  bool addVector(const boost::scoped_array<double>& fvec, double target);
+  bool addVector(const boost::scoped_array<double>& fvec,
+                 double target, double weight);
 
   bool getRow(const std::string& line,
               double* target,
               boost::scoped_array<double>& fvec,
-              double* cmpValue = NULL) const;
+              double* weight,
+              double* cmpValue) const;
 
   bool getEvalColumns(const std::string& line,
 		      boost::scoped_array<std::string>& feval) const;
 
   int getNumExamples() const {
     return numExamples_;
+  }
+
+  const std::unique_ptr<std::vector<double>>& getWeights() const {
+    return weights_;
   }
 
   void getFeatureVec(const int eid, boost::scoped_array<uint16_t>& fvec) const {
@@ -103,6 +109,7 @@ class DataSet {
 
   boost::scoped_array<FeatureData> features_;
   std::vector<double> targets_;
+  std::unique_ptr<std::vector<double>> weights_;
 
   friend class TreeRegressor;
   friend class Gbm;
@@ -126,4 +133,3 @@ template<class T> void split(const std::vector<int>& subset,
 }
 
 }
-

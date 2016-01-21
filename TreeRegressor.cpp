@@ -77,12 +77,13 @@ void TreeRegressor::getBestSplitFromHistogram(
   // Since the first term (sum of squares of all y-values) is independent
   // of our choice of where to split, it makes no difference, so we ignore it
   // in calculating loss.
+  // with weights, loss = - sum(w*y) * sum(w*y) / sum(w)
 
   // loss function if we don't split at all
-  double lossBefore = -1.0 * hist.totalSum * hist.totalSum / hist.totalCnt;
+  double lossBefore = -1.0 * hist.totalWeightedSum * hist.totalWeightedSum / hist.totalWeight;
 
-  int cntLeft = 0;       // number of observations on or to left of idx
-  double sumLeft = 0.0;  // number of observations strictly to right of idx
+  double weightLeft = 0;        // sum of weights for observations on or to left of idx
+  double weightedSumLeft = 0.0;  // sum of (w*y) for observations on or to left of idx
 
   double bestGain = 0.0;
   int bestIdx = -1;      // everything strictly to right of idx
@@ -91,22 +92,22 @@ void TreeRegressor::getBestSplitFromHistogram(
 
   for (int i = 0; i < hist.num - 1; i++) {
 
-    cntLeft += hist.cnt[i];
-    sumLeft += hist.sumy[i];
+    weightLeft += hist.weight[i];
+    weightedSumLeft += hist.sumwy[i];
 
-    double sumRight = hist.totalSum - sumLeft;
-    int cntRight = hist.totalCnt - cntLeft;
+    double weightedSumRight = hist.totalWeightedSum - weightedSumLeft;
+    int weightRight = hist.totalWeight - weightLeft;
 
-    if (cntLeft < FLAGS_min_leaf_examples) {
+    if (weightLeft < FLAGS_min_leaf_examples) {
       continue;
     }
-    if (cntRight < FLAGS_min_leaf_examples) {
+    if (weightRight < FLAGS_min_leaf_examples) {
       break;
     }
 
     double lossAfter =
-      -1.0 * sumLeft * sumLeft / cntLeft
-      - 1.0 * sumRight * sumRight / cntRight;
+      -1.0 * weightedSumLeft * weightedSumLeft / weightLeft
+      - 1.0 * weightedSumRight * weightedSumRight / weightRight;
 
     double gain = lossBefore - lossAfter;
     if (gain > bestGain) {
@@ -139,10 +140,19 @@ TreeRegressor::getBestSplit(const vector<int>* subset,
   // return a valid but degenerate split
   double bestGain = 0.0;
 
-  double totalSum = 0.0;  // sum of all target values
-
-  for (auto& id : *subset) {
-    totalSum += y_[id];
+  double totalWeightedSum = 0.0;  // sum of all target values
+  double totalWeights = 0.0;
+  const std::unique_ptr<std::vector<double>>& wv = ds_.getWeights();
+  if (wv) {
+    for (auto& id : *subset) {
+      totalWeights += (*wv)[id];
+      totalWeightedSum += (*wv)[id] * y_[id];
+    }
+  } else {
+    totalWeights = subset->size();
+    for (auto& id : *subset) {
+      totalWeightedSum += y_[id];
+    }
   }
 
   // For each of a random sampling of features, see if splitting on that
@@ -155,13 +165,13 @@ TreeRegressor::getBestSplit(const vector<int>* subset,
       continue;
     }
 
-    Histogram hist(f.transitions.size() + 1, subset->size(), totalSum);
+    Histogram hist(f.transitions.size() + 1, totalWeights, totalWeightedSum);
 
     if (f.encoding == BYTE) {
-      buildHistogram<uint8_t>(*subset, *(f.bvec), hist);
+      buildHistogram<uint8_t>(*subset, *(f.bvec), ds_.getWeights().get(), hist);
     } else {
       CHECK(f.encoding == SHORT);
-      buildHistogram<uint16_t>(*subset, *(f.svec), hist);
+      buildHistogram<uint16_t>(*subset, *(f.svec), ds_.getWeights().get(), hist);
     }
 
     int fv;
@@ -214,11 +224,9 @@ TreeNode<uint16_t>* TreeRegressor::getTreeHelper(
     return NULL;
   } else if (!split->selected) {
     // leaf of decision tree
-    double fvote = fun_.getLeafVal(*(split->subset), y_);
+    double fvote = fun_.getLeafVal(*(split->subset), y_, ds_.getWeights().get());
     LOG(INFO) << "leaf:  " << fvote << ", #examples:"
               << split->subset->size();
-    CHECK(split->subset->size() >= FLAGS_min_leaf_examples);
-
     return new LeafNode<uint16_t>(fvote);
   } else {
     // internal node of decision tree
@@ -228,7 +236,7 @@ TreeNode<uint16_t>* TreeRegressor::getTreeHelper(
               << std::min(split->left->subset->size(), split->right->subset->size());
 
     fimps[split->fid] += split->gain;
-    double fvote = fun_.getLeafVal(*(split->subset), y_);
+    double fvote = fun_.getLeafVal(*(split->subset), y_, ds_.getWeights().get());
     PartitionNode<uint16_t>* node = new PartitionNode<uint16_t>(split->fid, split->fv);
     node->setLeft(getTreeHelper(split->left, fimps));
     node->setRight(getTreeHelper(split->right, fimps));
@@ -289,4 +297,3 @@ TreeRegressor::SplitNode* TreeRegressor::getBestSplits(
 }
 
 }
-

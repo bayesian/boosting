@@ -10,7 +10,7 @@ enum LossFunction {
   L2Regression = 0,
   L2Logistic   = 1
 };
- 
+
 // Specifying the training parameters and data format
 struct Config {
 
@@ -44,6 +44,10 @@ struct Config {
 
   int getTargetIdx() const {
     return targetIdx_;
+  }
+
+  int getWeightIdx() const {
+    return weightIdx_;
   }
 
   int getCompareIdx() const {
@@ -93,8 +97,10 @@ struct Config {
 
   int targetIdx_;
   int cmpIdx_;
+  int weightIdx_;
+
   LossFunction lossFunction_;
-  
+
   std::vector<int> trainIdx_;
   std::vector<int> weakIdx_;
   std::vector<int> evalIdx_;

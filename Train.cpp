@@ -296,7 +296,7 @@ int main(int argc, char **argv) {
     LOG(INFO) << "num trees: " << numTrees;
     model.reserve(numTrees);
     for (int i = 0; i < numTrees; i++) {
-      model.push_back(fromJson<double>(obj["trees"][i]));
+      model.push_back(fromJson<double>(obj["trees"][i], cfg));
     }
   }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <unordered_map>
 #include <string>
 #include <vector>
 
@@ -63,6 +64,12 @@ struct Config {
     return allColumns_[trainIdx_[fidx]];
   }
 
+  // Returns -1 if feature is not found.
+  int getFeatureIndex(const std::string& f) const {
+    auto it = featureToIndexMap_.find(f);
+    return it != featureToIndexMap_.end() ? it->second : -1;
+  }
+
   const std::vector<int>& getWeakIdx() const {
     return weakIdx_;
   }
@@ -100,6 +107,7 @@ struct Config {
   std::vector<int> evalIdx_;
 
   std::vector<std::string> allColumns_;
+  std::unordered_map<std::string, int> featureToIndexMap_;
   char delimiter_;
 };
 

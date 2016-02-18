@@ -132,13 +132,21 @@ class LeafNode : public TreeNode<T> {
 
 // load a regression tree from Json
 template <class T>
-TreeNode<T>* fromJson(const folly::dynamic& obj) {
-  int index = obj["index"].asInt();
+TreeNode<T>* fromJson(const folly::dynamic& obj, const Config& cfg) {
+  const folly::dynamic* feature = nullptr;
+  try {
+    feature = &obj["feature"];
+  } catch(...) {
+  }
+
   double vote = static_cast<T>(obj["vote"].asDouble());
   
-  if (index == -1) {
+  if (!feature) {
     return new LeafNode<T>(vote);
   } else {
+    std::string featureName = feature->asString().toStdString();
+    int index = cfg.getFeatureIndex(featureName);
+    CHECK_GE(index, 0) << "Failed to find " << featureName << " in config.";
     T value;
     if (obj["value"].isInt()) {
       value = static_cast<T>(obj["value"].asInt());
@@ -146,8 +154,8 @@ TreeNode<T>* fromJson(const folly::dynamic& obj) {
       value = static_cast<T>(obj["value"].asDouble());
     }
     PartitionNode<T>* rt = new PartitionNode<T>(index, value);
-    rt->setLeft(fromJson<T>(obj["left"]));
-    rt->setRight(fromJson<T>(obj["right"]));
+    rt->setLeft(fromJson<T>(obj["left"], cfg));
+    rt->setRight(fromJson<T>(obj["right"], cfg));
     rt->setVote(vote);
     return rt;
   }

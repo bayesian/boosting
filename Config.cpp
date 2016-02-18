@@ -53,6 +53,7 @@ bool Config::readConfig(const std::string& fileName) {
     
     const dynamic& trainColumns = cfg["train_columns"];
     for (auto it = trainColumns.begin(); it != trainColumns.end(); ++it) {
+      featureToIndexMap_[it->asString().toStdString()] = trainIdx_.size();
       trainIdx_.push_back(columnIdx.at(it->asString()));
     }
 

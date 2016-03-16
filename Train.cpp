@@ -259,6 +259,9 @@ int main(int argc, char **argv) {
   unique_ptr<GbmFun> pfun = getGbmFun(cfg.getLossFunction());
   GbmFun& fun = *pfun;
 
+  unique_ptr<GbmFun> pCmpFun = getGbmFun(cfg.getLossFunction());
+  GbmFun& cmpFun = *pCmpFun;
+
   vector<TreeNode<double>*> model;
   DataSet ds(cfg, FLAGS_num_examples_for_bucketing,
              FLAGS_num_examples_for_training);
@@ -379,13 +382,15 @@ int main(int argc, char **argv) {
 	}
 
 	fun.accumulateExampleLoss(target, f);
-
+        cmpFun.accumulateExampleLoss(target, score);
 	if (fun.getNumExamples() % 1000 == 0) {
 	  LOG(INFO) << "test loss reduction: " << fun.getReduction()
 		    << " on num examples: " << fun.getNumExamples()
 		    << " total loss: " << fun.getLoss()
 		    << " logged score: " << score
-		    << " computed score: " << f;
+		    << " computed score: " << f
+                    << " cmp loss: " << cmpFun.getLoss()
+                    << " cmp reduction: " << cmpFun.getReduction();
 	}
       }
     }

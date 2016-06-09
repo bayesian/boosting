@@ -26,7 +26,8 @@ namespace boosting {
 class LogisticFun : public GbmFun {
  public:
   double getLeafVal(const std::vector<int>& subset,
-		    const boost::scoped_array<double>& y) const {
+		    const boost::scoped_array<double>& y,
+                    const std::vector<double>* wts = NULL) const {
     double wx = 0.0, wy = 0.0;
     for (const auto& id : subset) {
       double yi = y[id];
@@ -36,7 +37,8 @@ class LogisticFun : public GbmFun {
     return wy / wx;
   }
 
-  double getF0(const std::vector<double>& y) const {
+  double getF0(const std::vector<double>& y,
+               const std::vector<double>* wts = NULL) const {
     double sumy = 0.0;
     for (const auto yi  : y) {
       sumy += yi;
@@ -47,14 +49,15 @@ class LogisticFun : public GbmFun {
 
   void getGradient(const std::vector<double>& y,
 		   const boost::scoped_array<double>& F,
-		   boost::scoped_array<double>& grad) const {
+		   boost::scoped_array<double>& grad,
+                   const std::vector<double>* wts = NULL) const {
     int size = y.size();
     for (int i = 0; i < size; i++) {
       grad[i] = 2.0 * y[i]/(1.0 + exp(2.0 * y[i] * F[i]));
     }
   }
 
-  double getInitLoss(const std::vector<double>& y) const {
+  double getInitLoss(const std::vector<double>& y, const std::vector<double>* wts = NULL) const {
     int posCount = 0;
     for (const auto yi : y) {
       if (yi > 0) {
@@ -64,16 +67,16 @@ class LogisticFun : public GbmFun {
     return getEntropy(posCount, y.size()) * y.size();
   }
 
-  double getExampleLoss(const double y, const double f) const {
+  double getExampleLoss(const double y, const double f, const double w) const {
     return log(1.0 + exp(-2.0 * y * f));
   }
 
-  void accumulateExampleLoss(const double y, const double f) {
+  void accumulateExampleLoss(const double y, const double f, const double w) {
     numExamples_ += 1;
     if (y > 0) {
       posCount_ += 1;
     }
-    logloss_ += getExampleLoss(y, f);
+    logloss_ += getExampleLoss(y, f, 1.0);
   }
 
   double getReduction() const {

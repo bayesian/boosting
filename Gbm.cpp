@@ -68,7 +68,8 @@ class ParallelEval : public apache::thrift::concurrency::Runnable {
         //double score = weakModel_->eval(fvec);
         double score = ds_.getPrediction(weakModel_.get(), i);
         F_[i] += score;
-        subLoss_[workIdx_] += fun_.getExampleLoss(targets_[i], F_[i]);
+        const double wt = ds_.getWeights() ? (*(ds_.getWeights()))[i] : 1.0;
+        subLoss_[workIdx_] += fun_.getExampleLoss(targets_[i], F_[i], wt);
       }
     }
     monitor_.decrement();
@@ -97,14 +98,14 @@ void Gbm::getModel(
   boost::scoped_array<double> F(new double[numExamples]);
   boost::scoped_array<double> y(new double[numExamples]);
 
-  double f0 = fun_.getF0(ds_.targets_);
+  double f0 = fun_.getF0(ds_.targets_, ds_.getWeights().get());
   for (int i = 0; i < numExamples; i++) {
     F[i] = f0;
   }
 
   model->push_back(new LeafNode<double>(f0));
 
-  double initLoss = fun_.getInitLoss(ds_.targets_);
+  double initLoss = fun_.getInitLoss(ds_.targets_, ds_.getWeights().get());
 
   LOG(INFO) << "init avg loss " << initLoss / numExamples;
 
@@ -112,7 +113,7 @@ void Gbm::getModel(
 
     LOG(INFO) << "------- iteration " << it << " -------";
 
-    fun_.getGradient(ds_.targets_, F, y);
+    fun_.getGradient(ds_.targets_, F, y, ds_.getWeights().get());
     TreeRegressor regressor(ds_, y, fun_);
 
     std::unique_ptr<TreeNode<uint16_t>> weakModel(
@@ -150,7 +151,8 @@ void Gbm::getModel(
         // double score = weakModel->eval(fvec);
         double score = ds_.getPrediction(weakModel.get(), i);
         F[i] += score;
-        newLoss += fun_.getExampleLoss(ds_.targets_[i], F[i]);
+        const double wt = ds_.getWeights() ? (*(ds_.getWeights()))[i] : 1.0;
+        newLoss += fun_.getExampleLoss(ds_.targets_[i], F[i], wt);
       }
     }
 

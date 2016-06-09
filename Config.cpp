@@ -63,6 +63,10 @@ bool Config::readConfig(const std::string& fileName) {
     cmpIdx_ = (it != cfg.items().end())
       ? columnIdx[it->second.asString()] : -1;
 
+    it = cfg.find("weight_column");
+    weightIdx_ = (it != cfg.items().end())
+      ? columnIdx[it->second.asString()] : -1;
+
     it = cfg.find("loss_function");
     if (it != cfg.items().end() && it->second.asString() == "logistic") {
       lossFunction_ = L2Logistic;

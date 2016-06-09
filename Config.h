@@ -66,6 +66,10 @@ struct Config {
     return targetIdx_;
   }
 
+  int getWeightIdx() const {
+    return weightIdx_;
+  }
+
   int getCompareIdx() const {
     return cmpIdx_;
   }
@@ -119,6 +123,8 @@ struct Config {
 
   int targetIdx_;
   int cmpIdx_;
+  int weightIdx_;
+
   LossFunction lossFunction_;
 
   std::vector<int> trainIdx_;

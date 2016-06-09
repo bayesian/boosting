@@ -86,7 +86,11 @@ public:
 
   DataChunk(const Config& cfg, const DataSet& dataSet,
             CounterMonitor* monitorPtr = NULL) :
-    cfg_(cfg), dataSet_(dataSet), monitorPtr_(monitorPtr) {}
+    cfg_(cfg), dataSet_(dataSet), monitorPtr_(monitorPtr) {
+    if (cfg_.getWeightIdx() != -1) {
+      weights_.reset(new vector<double>());
+    }
+  }
 
   bool addLine(const string& s) {
     if (s.empty()) {
@@ -100,10 +104,14 @@ public:
     featureVectors_.reserve(lines_.size());
     targets_.reserve(lines_.size());
     boost::scoped_array<double> farr(new double[cfg_.getNumFeatures()]);
-    double target;
+    double target, weight, cmpValue;
+
     for (const string& line : lines_) {
-      if (dataSet_.getRow(line, &target, farr)) {
+      if (dataSet_.getRow(line, &target, farr, &weight, &cmpValue)) {
         targets_.push_back(target);
+        if (weights_) {
+          weights_->push_back(weight);
+        }
         featureVectors_.emplace_back(farr.get(),
                                      farr.get() + cfg_.getNumFeatures());
       }
@@ -121,10 +129,6 @@ public:
     return featureVectors_;
   }
 
-  const vector<double>& getTargets() const {
-    return targets_;
-  }
-
   size_t getLineBufferSize() const {
     return lines_.size();
   }
@@ -140,10 +144,12 @@ public:
       << "featureVectors_ and targets_ vectors must be the same size";
     boost::scoped_array<double> farr(new double[cfg_.getNumFeatures()]);
     size_t size = featureVectors_.size();
+
     for (size_t i = 0; i < size; ++i) {
       const auto fvec = featureVectors_[i];
       copy(fvec.begin(), fvec.end(), farr.get());
-      if (!dataSet->addVector(farr, targets_[i])) {
+      double weight = weights_ ? (*weights_)[i] : 1.0;
+      if (!dataSet->addVector(farr, targets_[i], weight)) {
         return i;
       }
     }
@@ -158,7 +164,7 @@ private:
   vector<string> lines_;
   vector<vector<double>> featureVectors_;
   vector<double> targets_;
-
+  unique_ptr<vector<double>> weights_;
 };
 
 // Divide training data file's lines into chunks,
@@ -256,6 +262,8 @@ int main(int argc, char **argv) {
   LOG(INFO) << "loading config";
 
   CHECK(cfg.readConfig(FLAGS_config_file));
+  LOG(INFO) << "Examples has weights: " << cfg.getWeightIdx();
+
   unique_ptr<GbmFun> pfun = getGbmFun(cfg.getLossFunction());
   GbmFun& fun = *pfun;
 
@@ -290,6 +298,9 @@ int main(int argc, char **argv) {
     }
 
     ds.close();
+
+    LOG(INFO) << "weights: " << (*ds.getWeights())[0];
+    LOG(INFO) << "weights 1024: " << (*ds.getWeights())[1024];
 
     // Second, train the models
     Gbm engine(fun, ds, cfg);
@@ -332,7 +343,7 @@ int main(int argc, char **argv) {
     }
 
     // See how well the model performs on testing data
-    double target, score;
+    double target, score, wt, cmpValue;
     boost::scoped_array<double> fvec(new double[cfg.getNumFeatures()]);
     int numEvalColumns = cfg.getEvalIdx().size();
     boost::scoped_array<string> feval(new string[numEvalColumns]);
@@ -357,13 +368,14 @@ int main(int argc, char **argv) {
       }
       string line;
       vector<double> scores;
+
       while(getline(*is, line)) {
-        ds.getRow(line, &target, fvec, &score);
+        ds.getRow(line, &target, fvec, &wt, &cmpValue);
         double f;
         if (FLAGS_find_optimal_num_trees) {
           f = predict_vec(model, fvec, &scores);
           for (int i = 0; i < model.size(); i++) {
-            funs[i]->accumulateExampleLoss(target, scores[i]);
+            funs[i]->accumulateExampleLoss(target, scores[i], wt);
           }
           scores.clear();
         } else {
@@ -378,7 +390,7 @@ int main(int argc, char **argv) {
 	  (*os) << f << endl;
 	}
 
-	fun.accumulateExampleLoss(target, f);
+	fun.accumulateExampleLoss(target, f, wt);
 
 	if (fun.getNumExamples() % 1000 == 0) {
 	  LOG(INFO) << "test loss reduction: " << fun.getReduction()

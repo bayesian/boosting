@@ -76,24 +76,25 @@ class TreeRegressor {
   // observations (as in a basic histogram), but also the sum of y-values
   // of those observations.
   struct Histogram {
-    const int num;             // number of buckets
-    std::vector<int> cnt;      // number of observations in each bucket
-    std::vector<double> sumy;  // sum of y-values of those observations
-    const int totalCnt;
-    const double totalSum;
+    const int num;                   // number of buckets
+    std::vector<double> weight;      // number of observations in each bucket
+    std::vector<double> sumwy;       // sum of y-values of those observations
+    const int totalWeight;
+    const double totalWeightedSum;
 
-    Histogram(int n, int cnt, double sum)
+    Histogram(int n, double sumw, double sumwy)
     : num(n),
-      cnt(num, 0),
-      sumy(num, 0.0),
-      totalCnt(cnt),
-      totalSum(sum) {
+      weight(num, 0.0),
+      sumwy(num, 0.0),
+      totalWeight(sumw),
+      totalWeightedSum(sumwy) {
     }
   };
 
   template<class T>
     void buildHistogram(const std::vector<int>& subset,
                         const std::vector<T>& fvec,
+			const std::vector<double>* weights,
                         Histogram& hist) const;
 
   // Choose the x-value such that, by splitting the data at that value, we
@@ -147,14 +148,24 @@ class TreeRegressor {
 template<class T>
   void TreeRegressor::buildHistogram(const std::vector<int>& subset,
                                      const std::vector<T>& fvec,
+				     const std::vector<double>* weights,
                                      Histogram& hist) const {
 
-  for(auto id : subset) {
-    const T& v = fvec[id];
+  if (weights == NULL) {
+    for(auto id : subset) {
+      const T& v = fvec[id];
 
-    hist.cnt[v] += 1;
-    hist.sumy[v] += y_[id];
+      hist.weight[v] += 1.0;
+      hist.sumwy[v] += y_[id];
+    }
+  } else {
+    for(auto id : subset) {
+      const T& v = fvec[id];
+      double w = (*weights)[id];
+
+      hist.weight[v] += w;
+      hist.sumwy[v] += w * y_[id];
+    }
   }
 }
-
 }

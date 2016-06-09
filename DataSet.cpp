@@ -44,6 +44,10 @@ DataSet::DataSet(const Config& cfg, int bucketingThresh, int examplesThresh)
     features_[i].fvec.reset(new vector<double>());
     features_[i].encoding = DOUBLE;
   }
+
+  if (cfg_.getWeightIdx() != -1) {
+    weights_.reset(new vector<double>());
+  }
 }
 
 bool DataSet::getEvalColumns(const std::string& line,
@@ -60,6 +64,7 @@ bool DataSet::getEvalColumns(const std::string& line,
 
 bool DataSet::getRow(const string& line, double* target,
                      boost::scoped_array<double>& fvec,
+                     double* weight,
                      double* cmpValue) const {
   try {
     vector<folly::StringPiece> sv;
@@ -83,7 +88,11 @@ bool DataSet::getRow(const string& line, double* target,
     if (cfg_.getCompareIdx() != -1 && cmpValue != NULL) {
       *cmpValue = atof(sv[cfg_.getCompareIdx()].toString().c_str());
     }
-
+    if (cfg_.getWeightIdx() != -1 && weight != NULL) {
+      *weight = atof(sv[cfg_.getWeightIdx()].toString().c_str());
+    } else {
+      *weight = 1.0;
+    }
   } catch (...) {
     LOG(ERROR) << "fail to process line: " << line;
     return false;
@@ -119,7 +128,7 @@ double DataSet::getPrediction(TreeNode<uint16_t>* rt, int eid) const {
 }
 
 bool DataSet::addVector(const boost::scoped_array<double>& fvec,
-                        double target) {
+                        double target, double weight) {
   if (examplesThresh_ != -1 && numExamples_ > examplesThresh_) {
     return false;
   }
@@ -147,6 +156,10 @@ bool DataSet::addVector(const boost::scoped_array<double>& fvec,
       }
     }
   }
+  if (weights_) {
+    weights_->push_back(weight);
+  }
+
   targets_.push_back(target);
   numExamples_++;
 

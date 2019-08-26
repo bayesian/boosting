@@ -1,5 +1,7 @@
 Fast & Simple implementation of GBM
 
+GBM is the generally regarded as best perform supervised learning algorithms before recent DL revolution. It is robust but not scalable.
+ 
 Goal:
 1) Fast (Handle 40M rows * 500 features within 10 hours)
 2) Simple (The less lines of code, the better) <= 3000
